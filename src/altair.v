@@ -1,77 +1,167 @@
 module altair(
 	input clk,
+	input pauseModeSW,
+	input stepPB,
 	input reset,
 	input rx,
 	output tx,
-	output [7:0] led
+	output sync,
+	output interrupt_ack,
+	output n_memWR,
+	output io_stack,
+	output halt_ack,
+	output ioWR,
+	output m1,
+	output ioRD,
+	output memRD,
+	output inte_o,
+	output [7:0] dataLEDs,
+	output [15:0] addrLEDs,
+	output [7:0] debugLEDs,
+	input [7:0] dataOraddrIn,
+	input [7:0] addrOrSenseIn,
+	input examinePB,
+	input examine_nextPB,
+	input depositPB,
+	input deposit_nextPB,
+	input resetPB,
+	input [2:0] prg_sel,
+	input enable_turn_mon
 );
-	reg ce = 0;
+	reg ce2 = 0;
 	reg intr = 0;	
 	reg [7:0] idata;
 	wire [15:0] addr;
-	wire rd;
 	wire wr_n;
 	wire inta_n;
 	wire [7:0] odata;
-	wire inte_o;
-	wire sync;
 
-	assign led = idata;
+	reg[7:0] sysctl;
+	
+	assign dataLEDs = idata;
+	assign addrLEDs = addr;
+	assign interrupt_ack = sysctl[0];
+	assign n_memWR = ~sysctl[1];
+	assign io_stack = sysctl[2];
+	assign halt_ack = sysctl[3];
+	assign ioWR = sysctl[4];
+	assign m1 = sysctl[5];
+	assign ioRD = sysctl[6];
+	assign memRD = sysctl[7];
+
+	assign debugLEDs = {onestep, examine_next_en, rd_examine_next, examine_en, rd_examine, pauseModeSW, rst_n, reset};
 
 	// Memory is sync so need one more clock to write/read
 	// This slows down CPU
 	always @(posedge clk) begin
-		ce <= !ce;
+		ce2 <= !ce2;
 	end
 
-	reg[7:0] sysctl;
-	
+	reg stepkey;
+	reg onestep;
+
+	// Single-step
+        always @(posedge clk) begin
+    		stepkey <= stepPB;
+    		onestep <= stepkey & ~stepPB;
+	end
+
+	wire depositPB_DB;
+	wire depositPB_OK = depositPB && pauseModeSW;;
+	wire depositPB_DN;
+	wire depositPB_UP;
+	wire deposit_latch;
+	wire deposit_en = deposit_latch && pauseModeSW;
+	wire [7:0] deposit_in;
+
+	wire deposit_nextPB_DB;
+	wire deposit_nextPB_OK = deposit_nextPB && pauseModeSW;
+	wire deposit_nextPB_DN;
+	wire deposit_nextPB_UP;
+	wire deposit_next_latch;
+	wire deposit_next_examine_latch;
+	wire deposit_next_en = deposit_latch && pauseModeSW;
+	wire [7:0] deposit_next_in;
+	wire [7:0] deposit_next_out;
+	reg  rd_deposit_examine_next;
+
+	wire examinePB_DB;
+	wire examinePB_OK = examinePB && pauseModeSW;
+	wire examinePB_DN;
+	wire examinePB_UP;
+	wire examine_latch;
+	wire examine_en = examine_latch && pauseModeSW;
+	wire [7:0] examine_out;
+	reg  rd_examine;
+
+	wire examine_nextPB_DB;
+	wire examine_nextPB_OK = examine_nextPB && pauseModeSW;
+	wire examine_nextPB_DN;
+	wire examine_nextPB_UP;
+	wire examine_next_latch;
+	wire examine_next_en = examine_next_latch && pauseModeSW;
+	wire [7:0] examine_next_out;
+	wire rd_examine_next;
+
+	reg  [7:0] rcnt = 8'h00;
+  	wire rst_n = (rcnt == 8'hFF);
+
 	wire [7:0] rom_out;
-	wire [7:0] ram_out;
+	wire [7:0] stack_out;
 	wire [7:0] rammain_out;
 	wire [7:0] boot_out;
 	wire [7:0] sio_out;
 	
 	wire boot;
 	
-	reg wr_ram;
+	reg wr_stack;
 	reg wr_rammain;
 	reg wr_sio;
 	
+	wire rd;
+
 	reg rd_boot;
-	reg rd_ram;
+	reg rd_stack;
 	reg rd_rammain;
 	reg rd_rom;
 	reg rd_sio;
+
+	wire ce = onestep | (ce2 & examine_en) | (ce2 & examine_next_en) | (ce2 & !pauseModeSW);
 	
 	always @(*) begin
 		rd_boot = 0;
-		rd_ram = 0;
+		rd_stack = 0;
 		rd_rammain = 0;
 		rd_rom = 0;
 		rd_sio = 0;
+		rd_examine = 0;
+		rd_examine_next = 0;
 		idata = 8'hff;		
-		casex ({boot,sysctl[6],addr[15:8]})
+		casex ({boot, sysctl[6], examine_en, examine_next_en, addr[15:8]})
+			// Examine
+			{4'b0010,8'bxxxxxxxx}: begin idata = examine_out; rd_examine = rd; end
+			// Examine
+			{4'b0001,8'bxxxxxxxx}: begin idata = examine_next_out; rd_examine_next = rd; end
 			// Turn-key BOOT
-			{2'b10,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end       // any address
+			{4'b1000,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end       // any address
 			// MEM MAP
-			{2'b00,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
-			{2'b00,8'b11111011}: begin idata = ram_out; rd_ram = rd; end         // 0xfb00-0xfbff
-			{2'b00,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
+			{4'b0000,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
+			{4'b0000,8'b11111011}: begin idata = stack_out; rd_stack = rd; end     // 0xfb00-0xfbff
+			{4'b0000,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
 			// I/O MAP - addr[15:8] == addr[7:0] for this section
-			{2'b01,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
+			{4'b0100,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
 		endcase
 	end
 
 	always @(*) begin
-		wr_ram = 0;
+		wr_stack = 0;
 		wr_sio = 0;
 		wr_rammain = 0;
 
 		casex ({sysctl[4],addr[15:8]})
 			// MEM MAP
 			{1'b0,8'b000xxxxx}: wr_rammain = ~wr_n; // 0x0000-0x1fff
-			{1'b0,8'b11111011}: wr_ram     = ~wr_n; // 0xfb00-0xfbff
+			{1'b0,8'b11111011}: wr_stack   = ~wr_n; // 0xfb00-0xfbff
 										  		        // 0xfd00-0xfdff read-only
 			// I/O MAP - addr[15:8] == addr[7:0] for this section
 			{1'b1,8'b000x000x}: wr_sio     = ~wr_n; // 0x00-0x01 0x10-0x11 
@@ -79,7 +169,16 @@ module altair(
 	end
 	
 	always @(posedge clk) begin
-		if (sync) sysctl <= odata;
+		if (reset)
+		begin
+			rcnt <= 8'h00;
+		end
+		else
+		begin
+			if (sync) sysctl <= odata;
+			if (rcnt != 8'hFF)
+				rcnt <= rcnt + 8'h01;
+		end
 	end
 	
 	i8080 cpu(
@@ -116,9 +215,9 @@ module altair(
 		.clk(clk),
 		.addr(addr[7:0]),
 		.data_in(odata),
-		.rd(rd_ram),
-		.we(wr_ram),
-		.data_out(ram_out)
+		.rd(rd_stack),
+		.we(wr_stack),
+		.data_out(stack_out)
 	);
 	
 	ram_memory #(.ADDR_WIDTH(13),.FILENAME("../roms/basic4k32.bin.mem")) mainmem(
@@ -141,5 +240,82 @@ module altair(
 		.ce(ce),
 		.rx(rx),
 		.tx(tx));
+
+	///////// DEPOSIT ////////////
+	debounce_pb deposit_DB (
+		.clk(clk),
+		.i_btn(depositPB_OK),
+		.o_state(depositPB_DB),
+		.o_ondn(depositPB_DN),
+		.o_onup(depositPB_UP)
+	);
+
+ 	deposit deposit_ff (
+		.clk(clk),
+		.reset(~rst_n),
+		.deposit(depositPB_DN),
+		.data_sw(dataOraddrIn),
+		.data_out(deposit_in),
+		.deposit_latch(deposit_latch)
+  	);
+
+	///////// DEPOSIT NEXT ////////////
+	debounce_pb deposit_next_DB (
+		.clk(clk),
+		.i_btn(deposit_nextPB_OK),
+		.o_state(deposit_nextPB_DB),
+		.o_ondn(deposit_nextPB_DN),
+		.o_onup(deposit_nextPB_UP)
+	);
+
+	deposit_next deposit_next_ff (
+		.clk(clk),
+		.reset(~rst_n),
+		.rd(rd_deposit_examine_next),
+		.deposit(deposit_nextPB_DN),
+		.data_sw(dataOraddrIn),
+		.deposit_out(deposit_next_in),
+		.deposit_latch(deposit_next_latch),
+		.data_out(deposit_next_out),
+		.examine_latch(deposit_next_examine_latch)
+  	);
+
+	///////// EXAMINE ////////////
+	debounce_pb examine_DB (
+		.clk(clk),
+		.i_btn(examinePB_OK),
+		.o_state(examinePB_DB),
+		.o_ondn(examinePB_DN),
+		.o_onup(examinePB_UP)
+	);
+
+	examine examine_ff (
+		.clk(clk),
+		.reset(~rst_n),
+		.rd(rd_examine),
+		.examine(examinePB_DN),
+		.data_out(examine_out),
+		.lo_addr(dataOraddrIn),
+		.hi_addr(addrOrSenseIn),
+		.examine_latch(examine_latch)
+  	);
+
+	///////// EXAMINE NEXT ////////////
+	debounce_pb examine_next_DB (
+		.clk(clk),
+		.i_btn(examine_nextPB_OK),
+		.o_state(examine_nextPB_DB),
+		.o_ondn(examine_nextPB_DN),
+		.o_onup(examine_nextPB_UP)
+  	);
+
+	examine_next examine_next_ff (
+		.clk(clk),
+		.reset(~rst_n),
+		.rd(rd_examine_next),
+		.examine(examine_nextPB_DN),
+		.data_out(examine_next_out),
+		.examine_latch(examine_next_latch)
+	);
 
 endmodule
