@@ -12,7 +12,7 @@ module top
   wire [15:0] diag16;
   wire [7:0] dataLEDs;
   wire [7:0] debugLEDs;
-  reg [7:0] dir;
+  reg [7:0] dir = 0;
   wire [7:0] sense;
   wire [7:0] status;
 

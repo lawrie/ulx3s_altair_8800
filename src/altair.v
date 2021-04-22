@@ -24,9 +24,7 @@ module altair(
 	input examine_nextPB,
 	input depositPB,
 	input deposit_nextPB,
-	input resetPB,
-	input [2:0] prg_sel,
-	input enable_turn_mon
+	input resetPB
 );
 	reg ce2 = 0;
 	reg intr = 0;	
@@ -35,6 +33,8 @@ module altair(
 	wire wr_n;
 	wire inta_n;
 	wire [7:0] odata;
+
+	reg [7:0] ram_in;
 
 	reg[7:0] sysctl;
 	
@@ -57,10 +57,10 @@ module altair(
 		ce2 <= !ce2;
 	end
 
+	// Single-step
 	reg stepkey;
 	reg onestep;
 
-	// Single-step
         always @(posedge clk) begin
     		stepkey <= stepPB;
     		onestep <= stepkey & ~stepPB;
@@ -81,6 +81,7 @@ module altair(
 	wire deposit_next_latch;
 	wire deposit_next_examine_latch;
 	wire deposit_next_en = deposit_latch && pauseModeSW;
+	wire deposit_examine_next_en = deposit_next_examine_latch && pauseModeSW;
 	wire [7:0] deposit_next_in;
 	wire [7:0] deposit_next_out;
 	reg  rd_deposit_examine_next;
@@ -101,7 +102,19 @@ module altair(
 	wire examine_next_latch;
 	wire examine_next_en = examine_next_latch && pauseModeSW;
 	wire [7:0] examine_next_out;
-	wire rd_examine_next;
+	reg rd_examine_next;
+
+	wire resetPB_DB;
+	wire resetPB_OK = resetPB && pauseModeSW;
+        wire resetPB_DN;
+	wire resetPB_UP;
+	wire reset_latch;
+	wire rd_reset;
+	wire [7:0] reset_out;
+	wire reset_en;
+	
+	wire rd_sense;
+	wire [7:0] sense_sw_out;
 
 	reg  [7:0] rcnt = 8'h00;
   	wire rst_n = (rcnt == 8'hFF);
@@ -136,20 +149,23 @@ module altair(
 		rd_sio = 0;
 		rd_examine = 0;
 		rd_examine_next = 0;
+		rd_deposit_examine_next = 0;
 		idata = 8'hff;		
-		casex ({boot, sysctl[6], examine_en, examine_next_en, addr[15:8]})
+		casex ({boot, sysctl[6], examine_en, examine_next_en, deposit_examine_next_en, addr[15:8]})
+			// Deposit examine next
+			{5'b00001,8'bxxxxxxxx}: begin idata = deposit_next_out; rd_deposit_examine_next = rd; end
 			// Examine
-			{4'b0010,8'bxxxxxxxx}: begin idata = examine_out; rd_examine = rd; end
-			// Examine
-			{4'b0001,8'bxxxxxxxx}: begin idata = examine_next_out; rd_examine_next = rd; end
+			{5'b00100,8'bxxxxxxxx}: begin idata = examine_out; rd_examine = rd; end
+			// Examine next
+			{5'b00010,8'bxxxxxxxx}: begin idata = examine_next_out; rd_examine_next = rd; end
 			// Turn-key BOOT
-			{4'b1000,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end       // any address
+			{5'b10000,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end       // any address
 			// MEM MAP
-			{4'b0000,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
-			{4'b0000,8'b11111011}: begin idata = stack_out; rd_stack = rd; end     // 0xfb00-0xfbff
-			{4'b0000,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
+			{5'b00000,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
+			{5'b00000,8'b11111011}: begin idata = stack_out; rd_stack = rd; end     // 0xfb00-0xfbff
+			{5'b00000,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
 			// I/O MAP - addr[15:8] == addr[7:0] for this section
-			{4'b0100,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
+			{5'b01000,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
 		endcase
 	end
 
@@ -157,14 +173,21 @@ module altair(
 		wr_stack = 0;
 		wr_sio = 0;
 		wr_rammain = 0;
+		ram_in = odata;
 
-		casex ({sysctl[4],addr[15:8]})
+		casex ({sysctl[4], deposit_en, deposit_next_en, addr[15:8]})
+			// Deposit
+			{3'b010,8'b000xxxxx}: begin wr_rammain = 1; ram_in = deposit_in; end
+			{3'b010,8'b11111011}: begin wr_stack = 1; ram_in = deposit_in; end
+			// Deposit next
+			{3'b001,8'b000xxxxx}: begin wr_rammain = 1; ram_in = deposit_next_in; end
+			{3'b001,8'b11111011}: begin wr_stack = 1; ram_in = deposit_next_in; end
 			// MEM MAP
-			{1'b0,8'b000xxxxx}: wr_rammain = ~wr_n; // 0x0000-0x1fff
-			{1'b0,8'b11111011}: wr_stack   = ~wr_n; // 0xfb00-0xfbff
-										  		        // 0xfd00-0xfdff read-only
+			{3'b000,8'b000xxxxx}: wr_rammain = ~wr_n; // 0x0000-0x1fff
+			{3'b000,8'b11111011}: wr_stack = ~wr_n;   // 0xfb00-0xfbff
+							          // 0xfd00-0xfdff read-only
 			// I/O MAP - addr[15:8] == addr[7:0] for this section
-			{1'b1,8'b000x000x}: wr_sio     = ~wr_n; // 0x00-0x01 0x10-0x11 
+			{3'b100,8'b000x000x}: wr_sio     = ~wr_n; // 0x00-0x01 0x10-0x11 
 		endcase
 	end
 	
@@ -214,7 +237,7 @@ module altair(
 	ram_memory #(.ADDR_WIDTH(8)) stack(
 		.clk(clk),
 		.addr(addr[7:0]),
-		.data_in(odata),
+		.data_in(ram_in),
 		.rd(rd_stack),
 		.we(wr_stack),
 		.data_out(stack_out)
@@ -223,7 +246,7 @@ module altair(
 	ram_memory #(.ADDR_WIDTH(13),.FILENAME("../roms/basic4k32.bin.mem")) mainmem(
 		.clk(clk),
 		.addr(addr[12:0]),
-		.data_in(odata),
+		.data_in(ram_in),
 		.rd(rd_rammain),
 		.we(wr_rammain),
 		.data_out(rammain_out)
@@ -316,6 +339,32 @@ module altair(
 		.examine(examine_nextPB_DN),
 		.data_out(examine_next_out),
 		.examine_latch(examine_next_latch)
+	);
+
+	///////// RESET ////////////
+	debounce_pb reset_DB (
+		.clk(clk),
+		.i_btn(resetPB_OK),
+		.o_state(resetPB_DB),
+		.o_ondn(resetPB_DN),
+		.o_onup(resetPB_UP)
+	);
+	
+	reset reset_ff (
+		.clk(clk),
+		.reset(~rst_n),
+		.rd(rd_reset),
+		.reset_in(resetPB_DN),
+		.data_out(reset_out),
+		.reset_latch(reset_latch)
+	);
+
+	///////// SENSE SWITCHES ////////////
+	sense_switch sense_sw (
+		.clk(clk),
+		.rd(rd_sense),
+		.data_out(sense_sw_out),
+		.switch_settings(addrOrSenseIn) // 0xFD for basic
 	);
 
 endmodule
