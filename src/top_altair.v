@@ -45,7 +45,7 @@ module top
 
   altair machine(
     .clk(clk_25mhz),
-    .reset(~resetn | ~ btn[0]),
+    .reset(~resetn),
     .rx(ftdi_txd),
     .tx(ftdi_rxd),
     .dataLEDs(dataLEDs),
@@ -59,6 +59,7 @@ module top
     .examine_nextPB(btn[3]),
     .depositPB(btn[4]),
     .deposit_nextPB(btn[5]),
+    .resetPB(~btn[0]),
     .interrupt_ack(interrupt_ack),
     .n_memWR(n_memWR),
     .io_stack(io_stack),

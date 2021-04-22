@@ -109,9 +109,9 @@ module altair(
         wire resetPB_DN;
 	wire resetPB_UP;
 	wire reset_latch;
-	wire rd_reset;
 	wire [7:0] reset_out;
-	wire reset_en;
+	wire reset_en = reset_latch && pauseModeSW;
+	reg rd_reset;
 	
 	wire rd_sense;
 	wire [7:0] sense_sw_out;
@@ -139,7 +139,7 @@ module altair(
 	reg rd_rom;
 	reg rd_sio;
 
-	wire ce = onestep | (ce2 & examine_en) | (ce2 & examine_next_en) | (ce2 & !pauseModeSW);
+	wire ce = onestep | (ce2 & examine_en) | (ce2 & reset_en) | (ce2 & examine_next_en) | (ce2 & deposit_examine_next_en) | (ce2 & !pauseModeSW);
 	
 	always @(*) begin
 		rd_boot = 0;
@@ -150,22 +150,25 @@ module altair(
 		rd_examine = 0;
 		rd_examine_next = 0;
 		rd_deposit_examine_next = 0;
+		rd_reset = 0;
 		idata = 8'hff;		
-		casex ({boot, sysctl[6], examine_en, examine_next_en, deposit_examine_next_en, addr[15:8]})
+		casex ({boot, sysctl[6], examine_en, examine_next_en, deposit_examine_next_en, reset_en, addr[15:8]})
 			// Deposit examine next
-			{5'b00001,8'bxxxxxxxx}: begin idata = deposit_next_out; rd_deposit_examine_next = rd; end
+			{6'b000010,8'bxxxxxxxx}: begin idata = deposit_next_out; rd_deposit_examine_next = rd; end
 			// Examine
-			{5'b00100,8'bxxxxxxxx}: begin idata = examine_out; rd_examine = rd; end
+			{6'b001000,8'bxxxxxxxx}: begin idata = examine_out; rd_examine = rd; end
 			// Examine next
-			{5'b00010,8'bxxxxxxxx}: begin idata = examine_next_out; rd_examine_next = rd; end
+			{6'b000100,8'bxxxxxxxx}: begin idata = examine_next_out; rd_examine_next = rd; end
+			// Reset
+			{6'b000001,8'bxxxxxxxx}: begin idata = reset_out; rd_reset = rd; end
 			// Turn-key BOOT
-			{5'b10000,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end       // any address
+			{6'b100000,8'bxxxxxxxx}: begin idata = boot_out; rd_boot = rd; end
 			// MEM MAP
-			{5'b00000,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
-			{5'b00000,8'b11111011}: begin idata = stack_out; rd_stack = rd; end     // 0xfb00-0xfbff
-			{5'b00000,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
+			{6'b000000,8'b000xxxxx}: begin idata = rammain_out; rd_rammain = rd; end // 0x0000-0x1fff
+			{6'b000000,8'b11111011}: begin idata = stack_out; rd_stack = rd; end     // 0xfb00-0xfbff
+			{6'b000000,8'b11111101}: begin idata = rom_out; rd_rom = rd; end         // 0xfd00-0xfdff
 			// I/O MAP - addr[15:8] == addr[7:0] for this section
-			{5'b01000,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
+			{6'b010000,8'b000x000x}: begin idata = sio_out; rd_sio = rd; end         // 0x00-0x01 0x10-0x11 
 		endcase
 	end
 
