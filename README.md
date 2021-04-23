@@ -39,6 +39,10 @@ The sense switches that also set the most significant bits of the address, are n
 
 There is no OSD for loading software yet.
 
+### Development
+
+The graphics/background.mem image is converted to by [img2fmem](https://github.com/projf/fpgatools/tree/master/img2fmem).
+
 ### Bugs
 
 The deposit next switch does not work correctly.
