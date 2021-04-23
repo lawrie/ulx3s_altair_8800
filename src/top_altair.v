@@ -34,12 +34,12 @@ module top
   wire clk_vga = clocks[1];
   wire clk_hdmi = clocks[0];
 
-  wire [15:0] diag16;
+  wire [15:0] addrLEDs;
   wire [7:0] dataLEDs;
   wire [7:0] debugLEDs;
   reg [7:0] dir = 0;
   wire [7:0] sense;
-  wire [7:0] status;
+  wire [7:0] statusLEDs;
 
   wire   [7:0]  red;
   wire   [7:0]  green;
@@ -51,10 +51,10 @@ module top
   generate
     genvar i;
     for(i = 0; i < 4; i = i+1) begin
-      assign gn[17-i] = diag16[8+i];
-      assign gp[17-i] = diag16[12+i];
-      assign gn[24-i] = diag16[i];
-      assign gp[24-i] = diag16[4+i];
+      assign gn[17-i] = addrLEDs[8+i];
+      assign gp[17-i] = addrLEDs[12+i];
+      assign gn[24-i] = addrLEDs[i];
+      assign gp[24-i] = addrLEDs[4+i];
 
       assign gp[i] = dir[i] ? 1'b0 : 1'bz;
       assign gn[i] = dir[i] ? 1'b0 : 1'bz;
@@ -69,7 +69,7 @@ module top
   wire resetn = &reset_cnt;
 
   wire interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD;
-  assign status = {interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD};
+  assign statusLEDS = {interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD};
 
   always @(posedge clk_25mhz) begin
     reset_cnt <= reset_cnt + !resetn;
@@ -81,7 +81,7 @@ module top
     .rx(ftdi_txd),
     .tx(ftdi_rxd),
     .dataLEDs(dataLEDs),
-    .addrLEDs(diag16),
+    .addrLEDs(addrLEDs),
     .debugLEDs(debugLEDs),
     .dataOraddrIn(sense),
     .addrOrSenseIn(8'b0),
@@ -109,7 +109,10 @@ module top
     .vga_b(blue),
     .vga_de(vga_de),
     .vga_hs(hsync),
-    .vga_vs(vsync)
+    .vga_vs(vsync),
+    .addrLEDs(addrLEDs),
+    .dataLEDs(dataLEDs),
+    .statusLEDs(statusLEDs)
   );
 
   // ===============================================================

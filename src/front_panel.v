@@ -7,7 +7,11 @@ module front_panel (
   output [7:0]  vga_g,
   output        vga_hs,
   output        vga_vs,
-  output        vga_de
+  output        vga_de,
+  input [15:0]  addrLEDs,
+  input [7:0]   dataLEDs,
+  input [7:0]   statusLEDs,
+  input [3:0]   otherLEDs
 );
 
   parameter HA = 640;
@@ -33,7 +37,8 @@ module front_panel (
   reg [9:0] hc = 0;
   reg [9:0] vc = 0;
 
-  reg [9:0] y = vc - VB2;
+  wire [9:0] x = hc;
+  reg [8:0] y = vc - VB2;
 
   always @(posedge clk) begin
     if (hc == HT - 1) begin
@@ -43,12 +48,129 @@ module front_panel (
     end else hc <= hc + 1;
   end
 
+  reg [9:0] addr_led_x[0:15];
+  reg [8:0] addr_led_y[0:15];
+  reg [9:0] data_led_x[0:7];
+  reg [8:0] data_led_y[0:7];
+  reg [9:0] status_led_x[0:7];
+  reg [8:0] status_led_y[0:7];
+  reg [9:0] other_led_x[0:3];
+  reg [8:0] other_led_y[0:3];
+  wire [15:0] in_addr_led;
+  wire [7:0] in_data_led;
+  wire [7:0] in_status_led;
+  wire [3:0] in_other_led;
+  wire [15:0] lit_addr_led;
+  wire [7:0] lit_data_led;
+  wire [7:0] lit_status_led;
+  wire [3:0] lit_other_led;
+ 
+  integer j;
+
+  initial begin
+    addr_led_x[0] = 565;
+    addr_led_x[1] = 542;
+    addr_led_x[2] = 518;
+    addr_led_x[3] = 483;
+    addr_led_x[4] = 459;
+    addr_led_x[5] = 436;
+    addr_led_x[6] = 400;
+    addr_led_x[7] = 377;
+    addr_led_x[8] = 353;
+    addr_led_x[9] = 317;
+    addr_led_x[10] = 294;
+    addr_led_x[11] = 270;
+    addr_led_x[12] = 234;
+    addr_led_x[13] = 211;
+    addr_led_x[14] = 187;
+    addr_led_x[15] = 152;
+    for (j=0;j<16;j=j+1) addr_led_y[j] = 89;
+    data_led_x[0] = 565;
+    data_led_x[1] = 542;
+    data_led_x[2] = 518;
+    data_led_x[3] = 483;
+    data_led_x[4] = 459;
+    data_led_x[5] = 436;
+    data_led_x[6] = 400;
+    data_led_x[7] = 377;
+    for (j=0;j<8;j=j+1) data_led_y[j] = 42;
+    status_led_x[0] = 294;
+    status_led_x[1] = 271;
+    status_led_x[2] = 248;
+    status_led_x[3] = 223;
+    status_led_x[4] = 200;
+    status_led_x[5] = 177;
+    status_led_x[6] = 154;
+    status_led_x[7] = 129;
+    for (j=0;j<8;j=j+1) status_led_y[j] = 42;
+    other_led_x[0] = 106;
+    other_led_x[1] = 83;
+    other_led_x[2] = 106;
+    other_led_x[3] = 83;
+    other_led_y[0] = 42;
+    other_led_y[1] = 42;
+    other_led_y[2] = 89;
+    other_led_y[3] = 89;
+  end
+
+  generate
+  genvar i;
+    for(i=0;i<16;i++) begin
+      assign in_addr_led[i]  = (y == addr_led_y[i] || y == addr_led_y[i] - 1 || y == addr_led_y[i] + 1) &&
+                               (x == addr_led_x[i] || x == addr_led_x[i] - 1 || x == addr_led_x[i] + 1);
+    end
+    for(i=0;i<8;i++) begin
+      assign in_data_led[i]  = (y == data_led_y[i] || y == data_led_y[i] - 1 || y == data_led_y[i] + 1) &&
+                               (x == data_led_x[i] || x == data_led_x[i] - 1 || x == data_led_x[i] + 1);
+    end
+    for(i=0;i<8;i++) begin
+      assign in_status_led[i]  = (y == status_led_y[i] || y == status_led_y[i] - 1 || y == status_led_y[i] + 1) &&
+                               (x == status_led_x[i] || x == status_led_x[i] - 1 || x == status_led_x[i] + 1);
+    end
+    for(i=0;i<5;i++) begin
+      assign in_other_led[i]  = (y == other_led_y[i] || y == other_led_y[i] - 1 || y == other_led_y[i] + 1) &&
+                               (x == other_led_x[i] || x == other_led_x[i] - 1 || x == other_led_x[i] + 1);
+    end
+    for(i=0;i<16;i++) begin
+      assign lit_addr_led[i]  = in_addr_led[i] && addrLEDs[i];
+    end
+    for(i=0;i<8;i++) begin
+      assign lit_data_led[i]  = in_data_led[i] && dataLEDs[i];
+    end
+    for(i=0;i<8;i++) begin
+      assign lit_status_led[i]  = in_status_led[i] && statusLEDs[i];
+    end
+    for(i=0;i<4;i++) begin
+      assign lit_other_led[i]  = in_other_led[i] && otherLEDs[i];
+    end
+  endgenerate
+
+  wire in_led = vga_de && (in_addr_led[0] || in_addr_led[1] || in_addr_led[2] || in_addr_led[3] ||
+	                   in_addr_led[4] || in_addr_led[5] || in_addr_led[6] || in_addr_led[7] ||
+	                   in_addr_led[8] || in_addr_led[9] || in_addr_led[10] || in_addr_led[11] ||
+	                   in_addr_led[12] || in_addr_led[13] || in_addr_led[14] || in_addr_led[15] ||
+		           in_data_led[0] || in_data_led[1] || in_data_led[2] || in_data_led[3] ||
+		           in_data_led[4] || in_data_led[5] || in_data_led[6] || in_data_led[7] ||
+		           in_status_led[0] || in_status_led[1] || in_status_led[2] || in_status_led[3] ||
+		           in_status_led[4] || in_status_led[5] || in_status_led[6] || in_status_led[7] ||
+		           in_other_led[0] || in_other_led[1] || in_other_led[2] || in_other_led[3]);
+
+  wire lit_led = vga_de && (lit_addr_led[0] || lit_addr_led[1] || lit_addr_led[2] || lit_addr_led[3] ||
+	                   lit_addr_led[4] || lit_addr_led[5] || lit_addr_led[6] || lit_addr_led[7] ||
+	                   lit_addr_led[8] || lit_addr_led[9] || lit_addr_led[10] || lit_addr_led[11] ||
+	                   lit_addr_led[12] || lit_addr_led[13] || lit_addr_led[14] || lit_addr_led[15] ||
+		           lit_data_led[0] || lit_data_led[1] || lit_data_led[2] || lit_data_led[3] ||
+		           lit_data_led[4] || lit_data_led[5] || lit_data_led[6] || lit_data_led[7] ||
+		           lit_status_led[0] || lit_status_led[1] || lit_status_led[2] || lit_status_led[3] ||
+		           lit_status_led[4] || lit_status_led[5] || lit_status_led[6] || lit_status_led[7] ||
+		           lit_other_led[0] || lit_other_led[1] || lit_other_led[2] || lit_other_led[3]);
+
   reg [3:0] color;
   reg [23:0] pixel;
 
   img_memory #(.ADDR_WIDTH(18), .FILENAME("../roms/background.mem")) background (
     .clk(clk),
-    .addr(y * 640 + hc),
+    .addr(y * 640 + x),
     .dout(color)
   );
 
@@ -60,9 +182,9 @@ module front_panel (
 
   wire in_panel = vga_de && y < 250;
 
-  assign vga_r = in_panel ? pixel[23:16] : 0;
-  assign vga_g = in_panel ? pixel[15:8] : 0;
-  assign vga_b = in_panel ? pixel[7:0] : 0;
+  assign vga_r = in_led ? 8'hff : in_panel ? pixel[23:16] : 0;
+  assign vga_g = in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[15:8] : 0;
+  assign vga_b = in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[7:0] : 0;
 
 endmodule
 
