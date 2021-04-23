@@ -71,8 +71,14 @@ module altair(
 	wire depositPB_DN;
 	wire depositPB_UP;
 	wire deposit_latch;
-	wire deposit_en = deposit_latch && pauseModeSW;
+	wire deposit_en0 = deposit_latch && pauseModeSW;
 	wire [7:0] deposit_in;
+        reg [1:0] deposit_cnt = 0;
+        reg [1:0] deposit_next_cnt = 0;
+
+	// Hack to avoid 2 spurious key presses
+	always @(posedge clk) if (deposit_en0 && deposit_cnt != 3) deposit_cnt <= deposit_cnt + 1;
+        wire deposit_en = deposit_en0 && deposit_cnt > 2;
 
 	wire deposit_nextPB_DB;
 	wire deposit_nextPB_OK = deposit_nextPB && pauseModeSW;
@@ -80,11 +86,15 @@ module altair(
 	wire deposit_nextPB_UP;
 	wire deposit_next_latch;
 	wire deposit_next_examine_latch;
-	wire deposit_next_en = deposit_latch && pauseModeSW;
+	wire deposit_next_en0 = deposit_next_latch && pauseModeSW;
 	wire deposit_examine_next_en = deposit_next_examine_latch && pauseModeSW;
 	wire [7:0] deposit_next_in;
 	wire [7:0] deposit_next_out;
 	reg  rd_deposit_examine_next;
+
+	// Hack to avoid 2 spurious key presses
+	always @(posedge clk) if (deposit_next_en0 && deposit_next_cnt != 3) deposit_next_cnt <= deposit_next_cnt + 1;
+        wire deposit_next_en = deposit_next_en0 && deposit_next_cnt > 2;
 
 	wire examinePB_DB;
 	wire examinePB_OK = examinePB && pauseModeSW;
@@ -139,7 +149,7 @@ module altair(
 	reg rd_rom;
 	reg rd_sio;
 
-	wire ce = onestep | (ce2 & examine_en) | (ce2 & reset_en) | (ce2 & examine_next_en) | (ce2 & deposit_examine_next_en) | (ce2 & !pauseModeSW);
+	wire ce = onestep | (ce2 & examine_en) | (ce2 & reset_en) | (ce2 & examine_next_en) | (ce2 & deposit_examine_next_en) | (ce2 & ~pauseModeSW);
 	
 	always @(*) begin
 		rd_boot = 0;
@@ -149,7 +159,7 @@ module altair(
 		rd_sio = 0;
 		rd_examine = 0;
 		rd_examine_next = 0;
-		rd_deposit_examine_next = 0;
+		rd_deposit_examine_next = 1;
 		rd_reset = 0;
 		idata = 8'hff;		
 		casex ({boot, sysctl[6], examine_en, examine_next_en, deposit_examine_next_en, reset_en, addr[15:8]})
@@ -279,7 +289,7 @@ module altair(
  	deposit deposit_ff (
 		.clk(clk),
 		.reset(~rst_n),
-		.deposit(depositPB_DN),
+		.deposit(depositPB_UP),
 		.data_sw(dataOraddrIn),
 		.data_out(deposit_in),
 		.deposit_latch(deposit_latch)
