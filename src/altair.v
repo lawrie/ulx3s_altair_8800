@@ -41,7 +41,7 @@ module altair(
 	assign dataLEDs = idata;
 	assign addrLEDs = addr;
 	assign interrupt_ack = sysctl[0];
-	assign n_memWR = ~sysctl[1];
+	assign n_memWR = sysctl[1];
 	assign io_stack = sysctl[2];
 	assign halt_ack = sysctl[3];
 	assign ioWR = sysctl[4];

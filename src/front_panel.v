@@ -127,7 +127,7 @@ module front_panel (
       assign in_status_led[i]  = (y == status_led_y[i] || y == status_led_y[i] - 1 || y == status_led_y[i] + 1) &&
                                (x == status_led_x[i] || x == status_led_x[i] - 1 || x == status_led_x[i] + 1);
     end
-    for(i=0;i<5;i++) begin
+    for(i=0;i<4;i++) begin
       assign in_other_led[i]  = (y == other_led_y[i] || y == other_led_y[i] - 1 || y == other_led_y[i] + 1) &&
                                (x == other_led_x[i] || x == other_led_x[i] - 1 || x == other_led_x[i] + 1);
     end
@@ -145,32 +145,17 @@ module front_panel (
     end
   endgenerate
 
-  wire in_led = vga_de && (in_addr_led[0] || in_addr_led[1] || in_addr_led[2] || in_addr_led[3] ||
-	                   in_addr_led[4] || in_addr_led[5] || in_addr_led[6] || in_addr_led[7] ||
-	                   in_addr_led[8] || in_addr_led[9] || in_addr_led[10] || in_addr_led[11] ||
-	                   in_addr_led[12] || in_addr_led[13] || in_addr_led[14] || in_addr_led[15] ||
-		           in_data_led[0] || in_data_led[1] || in_data_led[2] || in_data_led[3] ||
-		           in_data_led[4] || in_data_led[5] || in_data_led[6] || in_data_led[7] ||
-		           in_status_led[0] || in_status_led[1] || in_status_led[2] || in_status_led[3] ||
-		           in_status_led[4] || in_status_led[5] || in_status_led[6] || in_status_led[7] ||
-		           in_other_led[0] || in_other_led[1] || in_other_led[2] || in_other_led[3]);
+  wire in_led = vga_de && (|in_addr_led || |in_data_led || |in_status_led || |in_other_led);
 
-  wire lit_led = vga_de && (lit_addr_led[0] || lit_addr_led[1] || lit_addr_led[2] || lit_addr_led[3] ||
-	                   lit_addr_led[4] || lit_addr_led[5] || lit_addr_led[6] || lit_addr_led[7] ||
-	                   lit_addr_led[8] || lit_addr_led[9] || lit_addr_led[10] || lit_addr_led[11] ||
-	                   lit_addr_led[12] || lit_addr_led[13] || lit_addr_led[14] || lit_addr_led[15] ||
-		           lit_data_led[0] || lit_data_led[1] || lit_data_led[2] || lit_data_led[3] ||
-		           lit_data_led[4] || lit_data_led[5] || lit_data_led[6] || lit_data_led[7] ||
-		           lit_status_led[0] || lit_status_led[1] || lit_status_led[2] || lit_status_led[3] ||
-		           lit_status_led[4] || lit_status_led[5] || lit_status_led[6] || lit_status_led[7] ||
-		           lit_other_led[0] || lit_other_led[1] || lit_other_led[2] || lit_other_led[3]);
+  wire lit_led = |lit_addr_led || |lit_data_led || |lit_status_led || |lit_other_led;
 
   reg [3:0] color;
   reg [23:0] pixel;
+  wire [17:0] back_addr = y * 640 + x;
 
   img_memory #(.ADDR_WIDTH(18), .FILENAME("../roms/background.mem")) background (
     .clk(clk),
-    .addr(y * 640 + x),
+    .addr(back_addr),
     .dout(color)
   );
 
@@ -181,10 +166,11 @@ module front_panel (
   );
 
   wire in_panel = vga_de && y < 250;
+  wire border = vga_de && y < 250 && (x < 2 || x > 637 || y < 2 || y > 247);
 
-  assign vga_r = in_led ? 8'hff : in_panel ? pixel[23:16] : 0;
-  assign vga_g = in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[15:8] : 0;
-  assign vga_b = in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[7:0] : 0;
+  assign vga_r = border ? 0 : in_led ? 8'hff : in_panel ? pixel[23:16] : 0;
+  assign vga_g = border ? 0 : in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[15:8] : 0;
+  assign vga_b = border ? 8'hff : in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[7:0] : 0;
 
 endmodule
 

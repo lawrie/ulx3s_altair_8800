@@ -18,6 +18,9 @@ module top
   output [7:0] led
 );
 
+  // ===============================================================
+  // Clock generation
+  // ===============================================================
   wire [3:0] clocks;
   ecp5pll
   #(
@@ -34,20 +37,46 @@ module top
   wire clk_vga = clocks[1];
   wire clk_hdmi = clocks[0];
 
+  // ===============================================================
+  // Reset generation
+  // ===============================================================
+  reg [5:0] reset_cnt;
+  wire resetn = &reset_cnt;
+  
+  always @(posedge clk_25mhz) begin
+    reset_cnt <= reset_cnt + !resetn;
+  end
+
+  // ===============================================================
+  // Signals
+  // ===============================================================
   wire [15:0] addrLEDs;
-  wire [7:0] dataLEDs;
-  wire [7:0] debugLEDs;
-  reg [7:0] dir = 0;
-  wire [7:0] sense;
-  wire [7:0] statusLEDs;
+  wire [7:0]  dataLEDs;
+  wire [7:0]  debugLEDs;
+  wire [7:0]  sense;
+  wire        interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD;
 
-  wire   [7:0]  red;
-  wire   [7:0]  green;
-  wire   [7:0]  blue;
-  wire          hsync;
-  wire          vsync;
-  wire          vga_de;
+  wire [7:0]  red;
+  wire [7:0]  green;
+  wire [7:0]  blue;
+  wire        hsync;
+  wire        vsync;
+  wire        vga_de;
 
+  wire [3:0]  otherLEDs = {wt, hlda, inte, protect};
+  wire [7:0]  statusLEDs = {memRD, ioRD, m1, ioWR, halt_ack, io_stack, n_memWR, interrupt_ack};
+
+  reg [7:0]   dir = 0; // Dummy to make tri-state work
+  reg         protect = 0, inte = 0, hlda = 0, wt = ~sw[0];
+
+  // ===============================================================
+  // Built-in leds
+  // ===============================================================
+  assign led = statusLEDs;
+
+  // ===============================================================
+  // GPIO pins
+  // ===============================================================
   generate
     genvar i;
     for(i = 0; i < 4; i = i+1) begin
@@ -63,18 +92,9 @@ module top
     end
   endgenerate
 
-  assign led = dataLEDs;
-
-  reg [5:0] reset_cnt;
-  wire resetn = &reset_cnt;
-
-  wire interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD;
-  assign statusLEDS = {interrupt_ack, n_memWR, io_stack, halt_ack, ioWR, m1, ioRD, memRD};
-
-  always @(posedge clk_25mhz) begin
-    reset_cnt <= reset_cnt + !resetn;
-  end
-
+  // ===============================================================
+  // Altair 8800
+  // ===============================================================
   altair machine(
     .clk(clk_vga),
     .reset(~resetn),
@@ -102,6 +122,9 @@ module top
     .memRD(memRD)
   );
 
+  // ===============================================================
+  // Front panel
+  // ===============================================================
   front_panel fp (
     .clk(clk_vga),
     .vga_r(red),
@@ -112,7 +135,8 @@ module top
     .vga_vs(vsync),
     .addrLEDs(addrLEDs),
     .dataLEDs(dataLEDs),
-    .statusLEDs(statusLEDs)
+    .statusLEDs(statusLEDs),
+    .otherLEDs(otherLEDs)
   );
 
   // ===============================================================
