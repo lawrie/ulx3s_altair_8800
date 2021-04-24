@@ -77,7 +77,9 @@ module top
   // ===============================================================
   // Built-in leds
   // ===============================================================
-  assign led = statusLEDs;
+  wire [10:0] ps2_key;
+
+  assign led = statuLEDs;
 
   // ===============================================================
   // GPIO pins
@@ -141,7 +143,11 @@ module top
     .addrLEDs(addrLEDs),
     .dataLEDs(dataLEDs),
     .statusLEDs(statusLEDs),
-    .otherLEDs(otherLEDs)
+    .otherLEDs(otherLEDs),
+    .left(ps2_key == 11'h76b),
+    .right(ps2_key == 11'h774),
+    .up(ps2_key == 11'h775),
+    .down(ps2_key == 11'h772)
   );
 
   // ===============================================================
@@ -166,11 +172,9 @@ module top
   assign usb_fpga_pu_dp = 1; // pull-ups for us2 connector
   assign usb_fpga_pu_dn = 1;
 
-  wire [10:0] ps2_key;
-
   // Get PS/2 keyboard events
   ps2 ps2_kbd (
-    .clk(clk_cpu),
+    .clk(clk_vga),
     .ps2_clk(usb_fpga_bd_dp),
     .ps2_data(usb_fpga_bd_dn),
     .ps2_key(ps2_key)
