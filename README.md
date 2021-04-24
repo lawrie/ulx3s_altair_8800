@@ -1,5 +1,7 @@
 # Altair 8800 on the Ulx3s ECP5 FPGA board
 
+![Altair 8800](https://github.com/lawrie/lawrie.github.io/blob/master/images/altair.jpg)
+
 ### Introduction
 
 This is an implementation of the Altair 8800 kit computer from 1975.
