@@ -53,19 +53,20 @@ module front_panel (
   reg [9:0] addr_sw_x[0:15];
   reg [8:0] addr_sw_y[0:15];
   reg [9:0] data_led_x[0:7];
-  reg [8:0] data_sw_y[0:7];
-  reg [9:0] data_sw_x[0:7];
   reg [8:0] data_led_y[0:7];
   reg [9:0] status_led_x[0:7];
   reg [8:0] status_led_y[0:7];
   reg [9:0] other_led_x[0:3];
   reg [8:0] other_led_y[0:3];
+  reg [9:0] ctl_sw_x[0:8];
+  reg [8:0] ctl_sw_y[0:8];
   wire [15:0] in_addr_led;
   wire [15:0] in_addr_sw;
   wire [7:0] in_data_led;
   wire [7:0] in_data_sw;
   wire [7:0] in_status_led;
   wire [3:0] in_other_led;
+  wire [8:0] in_ctl_sw;
   wire [15:0] lit_addr_led;
   wire [7:0] lit_data_led;
   wire [7:0] lit_status_led;
@@ -108,7 +109,7 @@ module front_panel (
     addr_sw_x[13] = 211;
     addr_sw_x[14] = 187;
     addr_sw_x[15] = 152;
-    for (j=0;j<16;j=j+1) addr_sw_y[j] = 133;
+    for (j=0;j<16;j=j+1) addr_sw_y[j] = 134;
 
     data_led_x[0] = 565;
     data_led_x[1] = 542;
@@ -120,16 +121,6 @@ module front_panel (
     data_led_x[7] = 377;
     for (j=0;j<8;j=j+1) data_led_y[j] = 42;
 
-    data_sw_x[0] = 565;
-    data_sw_x[1] = 542;
-    data_sw_x[2] = 518;
-    data_sw_x[3] = 483;
-    data_sw_x[4] = 459;
-    data_sw_x[5] = 436;
-    data_sw_x[6] = 400;
-    data_sw_x[7] = 377;
-    for (j=0;j<8;j=j+1) data_sw_y[j] = 70;
-
     status_led_x[0] = 294;
     status_led_x[1] = 271;
     status_led_x[2] = 248;
@@ -139,6 +130,7 @@ module front_panel (
     status_led_x[6] = 154;
     status_led_x[7] = 129;
     for (j=0;j<8;j=j+1) status_led_y[j] = 42;
+
     other_led_x[0] = 106;
     other_led_x[1] = 83;
     other_led_x[2] = 106;
@@ -147,6 +139,17 @@ module front_panel (
     other_led_y[1] = 42;
     other_led_y[2] = 89;
     other_led_y[3] = 89;
+
+    ctl_sw_x[0] = 483;
+    ctl_sw_x[1] = 436;
+    ctl_sw_x[2] = 388;
+    ctl_sw_x[3] = 340;
+    ctl_sw_x[4] = 293;
+    ctl_sw_x[5] = 245;
+    ctl_sw_x[6] = 200;
+    ctl_sw_x[7] = 153;
+    ctl_sw_x[8] = 38;
+    for (j=0;j<9;j=j+1) ctl_sw_y[j] = 181;
   end
 
   generate
@@ -164,16 +167,16 @@ module front_panel (
                                (x == data_led_x[i] || x == data_led_x[i] - 1 || x == data_led_x[i] + 1);
     end
     for(i=0;i<8;i++) begin
-      assign in_data_sw[i]  = (y == data_sw_y[i] || y == data_sw_y[i] - 1 || y == data_sw_y[i] + 1) &&
-                              (x == data_sw_x[i] || x == data_sw_x[i] - 1 || x == data_sw_x[i] + 1);
-    end
-    for(i=0;i<8;i++) begin
       assign in_status_led[i]  = (y == status_led_y[i] || y == status_led_y[i] - 1 || y == status_led_y[i] + 1) &&
                                (x == status_led_x[i] || x == status_led_x[i] - 1 || x == status_led_x[i] + 1);
     end
     for(i=0;i<4;i++) begin
       assign in_other_led[i]  = (y == other_led_y[i] || y == other_led_y[i] - 1 || y == other_led_y[i] + 1) &&
                                (x == other_led_x[i] || x == other_led_x[i] - 1 || x == other_led_x[i] + 1);
+    end
+    for(i=0;i<9;i++) begin
+      assign in_ctl_sw[i]  = (y == ctl_sw_y[i] || y == ctl_sw_y[i] - 1 || y == ctl_sw_y[i] + 1) &&
+                             (x == ctl_sw_x[i] || x == ctl_sw_x[i] - 1 || x == ctl_sw_x[i] + 1);
     end
     for(i=0;i<16;i++) begin
       assign lit_addr_led[i]  = in_addr_led[i] && addrLEDs[i];
@@ -190,7 +193,7 @@ module front_panel (
   endgenerate
 
   wire in_led = vga_de && (|in_addr_led || |in_data_led || |in_status_led || |in_other_led);
-  wire in_sw = vga_de && (|in_addr_sw || |in_data_sw);
+  wire in_sw = vga_de && (|in_addr_sw || |in_ctl_sw);
 
   wire lit_led = |lit_addr_led || |lit_data_led || |lit_status_led || |lit_other_led;
 
