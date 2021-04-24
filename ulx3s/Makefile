@@ -5,7 +5,7 @@ VERILOG = ../src/top_altair.v ../src/altair.v ../src/jmp_boot.v \
 	  ../src/examine.v ../src/examine_next.v \
 	  ../src/reset.v ../src/sense_switch.v \
 	  ../src/frequency_divider.v \
-	  ../src/ecp5pll.sv ../src/hdmi.v \
+	  ../src/ecp5pll.sv ../src/hdmi.v ../src/ps2.v \
 	  ../src/front_panel.v ../src/img_memory.v ../src/palette_memory.v
 
 DEVICE=85k
