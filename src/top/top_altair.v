@@ -1,3 +1,4 @@
+`default_nettype none
 module top
 (
   // Clock
@@ -81,7 +82,13 @@ module top
   reg         protect = 0, inte = 0, hlda = 0, wt = ~sw[0];
 
   reg [6:0]   r_btn_joy;
+  reg [7:0]   r_cpu_control;
+  wire        spi_load = r_cpu_control[1];
   wire [10:0] ps2_key;
+  wire [31:0] spi_ram_addr;
+  wire        spi_ram_wr, spi_ram_rd;
+  wire [7:0]  spi_ram_di;
+  wire [7:0]  spi_ram_do;
 
   // ===============================================================
   // Built-in leds
@@ -133,7 +140,13 @@ module top
     .ioWR(ioWR),
     .m1(m1),
     .ioRD(ioRD),
-    .memRD(memRD)
+    .memRD(memRD),
+    .ram_out(spi_ram_do),
+    .spi_load(spi_load),
+    .spi_ram_addr(spi_ram_addr[12:0]),
+    .spi_ram_wr(spi_ram_wr && spi_ram_addr[31:24] == 8'h00),
+    .spi_ram_rd(spi_ram_rd),
+    .spi_ram_di(spi_ram_di)
   );
 
   // ===============================================================
@@ -160,11 +173,6 @@ module top
   // ===============================================================
   // SPI Slave from ESP32
   // ===============================================================
-  wire        spi_ram_wr, spi_ram_rd;
-  wire [31:0] spi_ram_addr;
-  wire [7:0]  spi_ram_di;
-  wire [7:0]  ram_out;
-  wire [7:0]  spi_ram_do = ram_out;
   wire        irq;
 
   assign sd_d[3] = 1'bz; // FPGA pin pullup sets SD card inactive at SPI bus
@@ -187,6 +195,12 @@ module top
     .data_in(spi_ram_do),
     .data_out(spi_ram_di)
   );
+
+  always @(posedge clk_cpu) begin
+    if (spi_ram_wr && spi_ram_addr[31:24] == 8'hFF) begin
+      r_cpu_control <= spi_ram_di;
+    end
+  end
 
   // ===============================================================
   // OSD

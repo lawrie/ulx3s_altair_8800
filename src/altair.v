@@ -1,3 +1,4 @@
+`default_nettype none
 module altair(
 	input clk,
 	input pauseModeSW,
@@ -24,7 +25,13 @@ module altair(
 	input examine_nextPB,
 	input depositPB,
 	input deposit_nextPB,
-	input resetPB
+	input resetPB,
+	output [7:0] ram_out,
+	input  spi_load,
+	input  [12:0] spi_ram_addr,
+	input  spi_ram_wr,
+	input  spi_ram_rd,
+	input [7:0] spi_ram_di
 );
 	reg ce2 = 0;
 	reg intr = 0;	
@@ -148,6 +155,8 @@ module altair(
 	reg rd_rammain;
 	reg rd_rom;
 	reg rd_sio;
+	
+	assign ram_out = rammain_out;
 
 	wire ce = onestep | (ce2 & examine_en) | (ce2 & reset_en) | (ce2 & examine_next_en) | (ce2 & deposit_examine_next_en) | (ce2 & ~pauseModeSW);
 	
@@ -258,10 +267,10 @@ module altair(
 	
 	ram_memory #(.ADDR_WIDTH(13),.FILENAME("../roms/basic4k32.bin.mem")) mainmem(
 		.clk(clk),
-		.addr(addr[12:0]),
-		.data_in(ram_in),
-		.rd(rd_rammain),
-		.we(wr_rammain),
+		.addr(spi_load ? spi_ram_addr : addr[12:0]),
+		.data_in(spi_load ? spi_ram_di : ram_in),
+		.rd(spi_load ? spi_ram_rd : rd_rammain),
+		.we(spi_load ? spi_ram_wr : wr_rammain),
 		.data_out(rammain_out)
 	);
 	
