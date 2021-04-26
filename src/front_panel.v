@@ -64,6 +64,8 @@ module front_panel (
   reg [8:0] other_led_y[0:3];
   reg [9:0] ctl_sw_x[0:8];
   reg [8:0] ctl_sw_y[0:8];
+  reg [15:0] addr_sw = 0;
+  reg [8:0] ctl_sw;
 
   reg [4:0] curr_sw = 0;
 
@@ -78,6 +80,8 @@ module front_panel (
   wire [7:0] lit_data_led;
   wire [7:0] lit_status_led;
   wire [3:0] lit_other_led;
+  wire [15:0] on_addr_sw;
+  wire [8:0] on_ctl_sw;
   wire [15:0] curr_addr_sw;
   wire [8:0] curr_ctl_sw;
  
@@ -205,10 +209,17 @@ module front_panel (
     for(i=0;i<9;i++) begin
       assign curr_ctl_sw[i]  = in_ctl_sw[i] && curr_sw == 16 + i;
     end
+    for(i=0;i<16;i++) begin
+      assign on_addr_sw[i]  = in_addr_sw[i] && addr_sw[i];
+    end
+    for(i=0;i<9;i++) begin
+      assign on_ctl_sw[i]  = in_ctl_sw[i] && ctl_sw[i];
+    end
   endgenerate
 
   wire in_led = vga_de && (|in_addr_led || |in_data_led || |in_status_led || |in_other_led);
   wire in_sw = vga_de && (|in_addr_sw || |in_ctl_sw);
+  wire on_sw = |on_addr_sw || |on_ctl_sw;
 
   wire lit_led = |lit_addr_led || |lit_data_led || |lit_status_led || |lit_other_led;
   wire in_curr_sw = |curr_addr_sw || |curr_ctl_sw;
@@ -226,6 +237,18 @@ module front_panel (
     end else if (left) begin
       if (curr_sw == 0) curr_sw <= NUM_SW - 1;
       else curr_sw <= curr_sw - 1;
+    end else if (up) begin
+      if (curr_sw < 16) begin
+        addr_sw[curr_sw] <= 1;
+      end else begin
+        ctl_sw[curr_sw - 16] <= 1;
+      end
+    end else if (down) begin
+      if (curr_sw < 16) begin
+        addr_sw[curr_sw] <= 0;
+      end else begin
+        ctl_sw[curr_sw - 16] <= 0;
+      end
     end
   end
 
@@ -244,9 +267,9 @@ module front_panel (
   wire in_panel = vga_de && y < 250;
   wire border = vga_de && y < 250 && (x < 2 || x > 637 || y < 2 || y > 247);
 
-  assign vga_r = border ? 0 : in_sw ? (in_curr_sw ? 8'hff : 0) : in_led ? 8'hff : in_panel ? pixel[23:16] : 0;
+  assign vga_r = border ? 0 : in_sw ? (in_curr_sw ? 8'hff : (on_sw ? 8'hff : 0)) : in_led ? 8'hff : in_panel ? pixel[23:16] : 0;
   assign vga_g = border ? 0 : in_sw ? 8'hff : in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[15:8] : 0;
-  assign vga_b = border ? 8'hff : in_sw ? 0 : in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[7:0] : 0;
+  assign vga_b = border ? 8'hff : in_sw ? (on_sw ? 8'hff : 0) : in_led ? (lit_led ? 8'hff : 0) : in_panel ? pixel[7:0] : 0;
 
 endmodule
 
