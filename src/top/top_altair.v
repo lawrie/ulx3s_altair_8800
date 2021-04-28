@@ -63,6 +63,7 @@ module top
   // Signals
   // ===============================================================
   wire [15:0] addrLEDs;
+  wire [15:0] addrSWs;
   wire [7:0]  dataLEDs;
   wire [7:0]  debugLEDs;
   wire [7:0]  sense;
@@ -101,10 +102,10 @@ module top
   generate
     genvar i;
     for(i = 0; i < 4; i = i+1) begin
-      assign gn[17-i] = addrLEDs[8+i];
-      assign gp[17-i] = addrLEDs[12+i];
-      assign gn[24-i] = addrLEDs[i];
-      assign gp[24-i] = addrLEDs[4+i];
+      assign gn[17-i] = addrSWs[8+i];
+      assign gp[17-i] = addrSWs[12+i];
+      assign gn[24-i] = addrSWs[i];
+      assign gp[24-i] = addrSWs[4+i];
 
       assign gp[i] = dir[i] ? 1'b0 : 1'bz;
       assign gn[i] = dir[i] ? 1'b0 : 1'bz;
@@ -124,8 +125,8 @@ module top
     .dataLEDs(dataLEDs),
     .addrLEDs(addrLEDs),
     .debugLEDs(debugLEDs),
-    .dataOraddrIn(sense),
-    .addrOrSenseIn(8'b0),
+    .dataOraddrIn(addrSWs[7:0]),
+    .addrOrSenseIn(addrSWs[15:8]),
     .stepPB(btn[1]),
     .pauseModeSW(~sw[0]),
     .examinePB(btn[2]),
@@ -161,6 +162,7 @@ module top
     .vga_hs(hsync),
     .vga_vs(vsync),
     .addrLEDs(addrLEDs),
+    .addrSWs(addrSWs),
     .dataLEDs(dataLEDs),
     .statusLEDs(statusLEDs),
     .otherLEDs(otherLEDs),

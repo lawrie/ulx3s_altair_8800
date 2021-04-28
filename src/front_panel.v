@@ -12,6 +12,7 @@ module front_panel (
   input [7:0]   dataLEDs,
   input [7:0]   statusLEDs,
   input [3:0]   otherLEDs,
+  output [15:0] addrSWs,
   input         left,
   input         right,
   input         up,
@@ -85,6 +86,8 @@ module front_panel (
   wire [15:0] curr_addr_sw;
   wire [8:0] curr_ctl_sw;
  
+  assign addrSWs = addr_sw;
+
   integer j;
 
   initial begin
@@ -231,10 +234,10 @@ module front_panel (
   localparam NUM_SW = 25;
 
   always @(posedge clk) begin
-    if (right) begin
+    if (left) begin
       if (curr_sw == NUM_SW -1) curr_sw <= 0;
       else curr_sw <= curr_sw + 1;
-    end else if (left) begin
+    end else if (right) begin
       if (curr_sw == 0) curr_sw <= NUM_SW - 1;
       else curr_sw <= curr_sw - 1;
     end else if (up) begin
